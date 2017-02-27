@@ -35,11 +35,15 @@ public class ISPRobot {
     static private EV3ColorSensor colorSensor = new EV3ColorSensor(SensorPort.S3);
     static private SampleProvider color = colorSensor.getRGBMode();
 
+    // Safety
+    static private boolean forwardDanger = false;
+    static private boolean movingForward = false;
+
     // Socket
     static private Socket socket;
 
     public static void main(String[] args) throws Exception {
-        URI uri = new URI("http://192.168.14.222");
+        URI uri = new URI("http://192.168.12.105");
         Manager manager = new Manager(uri);
         socket = manager.socket("/robot");
 
@@ -50,6 +54,7 @@ public class ISPRobot {
 
         print("[STARTUP] Initialized");
 
+        g.clear();
         g.drawString("Press any button", 0, 0, GraphicsLCD.VCENTER | GraphicsLCD.LEFT);
         Button.waitForAnyPress();
         g.clear();
@@ -130,7 +135,12 @@ public class ISPRobot {
             @Override
             public void timedOut() {
                 dist.fetchSample(distSample, 0);
-                if (distSample[0] < 0.2) stop(); // Protects against (physical) crashing
+                if (distSample[0] < 0.2) {
+                    forwardDanger = true;
+                    if (movingForward) stop();
+                } else {
+                    forwardDanger = false;
+                }
             }
         });
         safety.start();
@@ -141,10 +151,13 @@ public class ISPRobot {
     }
 
     private static void setForward() {
-        leftMotor.startSynchronization();
-        leftMotor.forward();
-        rightMotor.forward();
-        leftMotor.endSynchronization();
+        if (!forwardDanger) {
+            leftMotor.startSynchronization();
+            leftMotor.forward();
+            rightMotor.forward();
+            leftMotor.endSynchronization();
+            movingForward = true;
+        }
     }
 
     public static void setBackward() {
@@ -155,11 +168,11 @@ public class ISPRobot {
     }
 
     private static void raiseArm() {
-        armMotor.forward();
+        if (!forwardDanger) armMotor.forward();
     }
 
     private static void lowerArm() {
-        armMotor.backward();
+        if (!forwardDanger) armMotor.backward();
     }
 
     private static void stop() {
@@ -168,16 +181,21 @@ public class ISPRobot {
         rightMotor.stop();
         leftMotor.endSynchronization();
         armMotor.stop();
+        movingForward = false;
     }
 
     private static void continuousTurnRight() {
-        rightMotor.stop();
-        leftMotor.forward();
+        if (!forwardDanger) {
+            rightMotor.stop();
+            leftMotor.forward();
+        }
     }
 
     private static void continuousTurnLeft() {
-        leftMotor.stop();
-        rightMotor.forward();
+        if (!forwardDanger) {
+            leftMotor.stop();
+            rightMotor.forward();
+        }
     }
 
 
